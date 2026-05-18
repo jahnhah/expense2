@@ -1,0 +1,182 @@
+'use client';
+
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { getCurrencySymbol } from '@/lib/types';
+import type { MemberBalance } from '@/lib/types';
+import { computeSettlements } from '@/lib/calculations';
+import { round } from '@/lib/formula-engine';
+import { cn } from '@/lib/utils';
+import { TrendingUp, TrendingDown, Minus, ArrowRight } from 'lucide-react';
+
+interface BalanceTableProps {
+  balances: MemberBalance[];
+  currency: string;
+}
+
+function MemberAvatar({ member }: { member: MemberBalance['member'] }) {
+  const initials = member.name
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
+  return (
+    <div
+      className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+      style={{ backgroundColor: member.color }}
+    >
+      {initials}
+    </div>
+  );
+}
+
+export function BalanceTable({ balances, currency }: BalanceTableProps) {
+  const sym = getCurrencySymbol(currency);
+  const settlements = computeSettlements(balances);
+  const memberMap = new Map(balances.map((b) => [b.member.id, b.member]));
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+      {/* Balance table */}
+      <Card className="lg:col-span-3">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold">Member Balances</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Member
+                  </th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Paid
+                  </th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Owes
+                  </th>
+                  <th className="text-right px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Balance
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {balances.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="text-center py-10 text-muted-foreground text-sm">
+                      No members yet
+                    </td>
+                  </tr>
+                ) : (
+                  balances.map((b) => {
+                    const isPositive = b.balance > 0.01;
+                    const isNegative = b.balance < -0.01;
+
+                    return (
+                      <tr
+                        key={b.member.id}
+                        className="border-b border-border/50 hover:bg-muted/30 transition-colors"
+                      >
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-2.5">
+                            <MemberAvatar member={b.member} />
+                            <span className="font-medium text-foreground">{b.member.name}</span>
+                          </div>
+                        </td>
+                        <td className="text-right px-4 py-3.5 text-foreground">
+                          {sym}{round(b.totalPaid, 2)}
+                        </td>
+                        <td className="text-right px-4 py-3.5 text-foreground">
+                          {sym}{round(b.totalOwed, 2)}
+                        </td>
+                        <td className="text-right px-5 py-3.5">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {isPositive ? (
+                              <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
+                            ) : isNegative ? (
+                              <TrendingDown className="w-3.5 h-3.5 text-red-500" />
+                            ) : (
+                              <Minus className="w-3.5 h-3.5 text-muted-foreground" />
+                            )}
+                            <span
+                              className={cn(
+                                'font-semibold',
+                                isPositive && 'text-emerald-500',
+                                isNegative && 'text-red-500',
+                                !isPositive && !isNegative && 'text-muted-foreground'
+                              )}
+                            >
+                              {isPositive ? '+' : ''}
+                              {sym}{round(b.balance, 2)}
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Suggested Settlements */}
+      <Card className="lg:col-span-2">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold">Suggested Settlements</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {settlements.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center mb-3">
+                <TrendingUp className="w-5 h-5 text-emerald-500" />
+              </div>
+              <p className="text-sm font-medium text-foreground">All settled!</p>
+              <p className="text-xs text-muted-foreground mt-1">No payments needed</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {settlements.map((s, i) => {
+                const from = memberMap.get(s.from);
+                const to = memberMap.get(s.to);
+                if (!from || !to) return null;
+
+                return (
+                  <div
+                    key={i}
+                    className="flex items-center gap-2 p-3 rounded-lg bg-muted/40 border border-border/50"
+                  >
+                    <div
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                      style={{ backgroundColor: from.color }}
+                    >
+                      {from.name[0]}
+                    </div>
+                    <ArrowRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    <div
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                      style={{ backgroundColor: to.color }}
+                    >
+                      {to.name[0]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-muted-foreground truncate">
+                        {from.name} → {to.name}
+                      </p>
+                    </div>
+                    <span className="text-sm font-bold text-foreground shrink-0">
+                      {sym}{s.amount}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
