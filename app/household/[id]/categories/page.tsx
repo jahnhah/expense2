@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import type { Category } from '@/lib/types';
+import type { Category, Member } from '@/lib/types';
 import { CATEGORY_COLORS } from '@/lib/types';
+import { FormulaInput } from '@/components/transactions/formula-input';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -64,11 +65,13 @@ export default function CategoriesPage() {
   const householdId = params.id as string;
 
   const [categories, setCategories] = useState<Category[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [editCategory, setEditCategory] = useState<Category | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [defaultFormulas, setDefaultFormulas] = useState<Record<string, string>>({});
   const [form, setForm] = useState({
     name: '',
     color: CATEGORY_COLORS[0],
@@ -77,12 +80,20 @@ export default function CategoriesPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from('categories')
-      .select('*')
-      .eq('household_id', householdId)
-      .order('name');
-    setCategories(data ?? []);
+    const [catRes, membersRes] = await Promise.all([
+      supabase
+        .from('categories')
+        .select('*')
+        .eq('household_id', householdId)
+        .order('name'),
+      supabase
+        .from('members')
+        .select('*')
+        .eq('household_id', householdId)
+        .order('created_at'),
+    ]);
+    setCategories(catRes.data ?? []);
+    setMembers(membersRes.data ?? []);
     setLoading(false);
   }, [householdId]);
 
@@ -96,12 +107,26 @@ export default function CategoriesPage() {
       color: CATEGORY_COLORS[categories.length % CATEGORY_COLORS.length],
       default_formula: 'proportional',
     });
+    setDefaultFormulas(
+      Object.fromEntries(
+        members.map((m) => [m.id, '1'])
+      )
+    );
     setEditCategory(null);
     setShowAdd(true);
   }
 
   function openEdit(c: Category) {
     setForm({ name: c.name, color: c.color, default_formula: c.default_formula });
+    if (c.default_formulas) {
+      setDefaultFormulas(c.default_formulas);
+    } else {
+      setDefaultFormulas(
+        Object.fromEntries(
+          members.map((m) => [m.id, '1'])
+        )
+      );
+    }
     setEditCategory(c);
     setShowAdd(true);
   }
@@ -123,7 +148,12 @@ export default function CategoriesPage() {
     if (editCategory) {
       await supabase
         .from('categories')
-        .update({ name: form.name.trim(), color: form.color, default_formula: form.default_formula })
+        .update({
+          name: form.name.trim(),
+          color: form.color,
+          default_formula: form.default_formula,
+          default_formulas: form.default_formula === 'proportional' ? defaultFormulas : {},
+        })
         .eq('id', editCategory.id);
     } else {
       await supabase.from('categories').insert({
@@ -131,6 +161,7 @@ export default function CategoriesPage() {
         name: form.name.trim(),
         color: form.color,
         default_formula: form.default_formula,
+        default_formulas: form.default_formula === 'proportional' ? defaultFormulas : {},
       });
     }
 
@@ -251,7 +282,7 @@ export default function CategoriesPage() {
 
       {/* Add/Edit Modal */}
       <Dialog open={showAdd} onOpenChange={setShowAdd}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editCategory ? 'Edit Category' : 'Add Category'}</DialogTitle>
             <DialogDescription>
@@ -298,6 +329,41 @@ export default function CategoriesPage() {
                 </span>
               </div>
             </div>
+
+            {/* Default formulas for proportional categories */}
+            {form.default_formula === 'proportional' && members.length > 0 && (
+              <div className="space-y-3">
+                <Label>Default Member Formulas</Label>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {members.map((m) => (
+                    <div
+                      key={m.id}
+                      className="rounded-lg border border-border bg-card p-3 flex items-center gap-3"
+                    >
+                      <div
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                        style={{ backgroundColor: m.color }}
+                      >
+                        {m.name[0]}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground">{m.name}</p>
+                      </div>
+                      <div className="w-32 shrink-0">
+                        <FormulaInput
+                          value={defaultFormulas[m.id] ?? '1'}
+                          onChange={(v) => setDefaultFormulas((df) => ({ ...df, [m.id]: v }))}
+                          placeholder="e.g. 2 * 7"
+                          memberName={m.name}
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label>Color</Label>
               <div className="flex flex-wrap gap-2">
