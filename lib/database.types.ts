@@ -51,6 +51,7 @@ export type Database = {
           name: string;
           default_formula: string;
           color: string;
+          default_formulas: Record<string, string>;
           created_at: string;
         };
         Insert: {
@@ -59,6 +60,7 @@ export type Database = {
           name: string;
           default_formula?: string;
           color?: string;
+          default_formulas?: Record<string, string>;
           created_at?: string;
         };
         Update: {
@@ -67,6 +69,7 @@ export type Database = {
           name?: string;
           default_formula?: string;
           color?: string;
+          default_formulas?: Record<string, string>;
           created_at?: string;
         };
       };
