@@ -19,6 +19,7 @@ export interface Category {
   name: string;
   default_formula: string;
   color: string;
+  default_formulas?: Record<string, string>;
   created_at: string;
 }
 

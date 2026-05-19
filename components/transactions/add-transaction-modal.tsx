@@ -87,6 +87,16 @@ export function AddTransactionModal({
       const cat = categories.find((c) => c.id === categoryId);
       if (cat) {
         setSplitType(cat.default_formula === 'equal' ? 'equal' : 'proportional');
+        
+        // Apply default formulas if they exist
+        if (cat.default_formula === 'proportional' && cat.default_formulas) {
+          setParticipants((prev) =>
+            prev.map((p) => ({
+              ...p,
+              formula: cat.default_formulas?.[p.memberId] ?? '1',
+            }))
+          );
+        }
       }
     }
   }, [categoryId, categories]);
