@@ -138,7 +138,7 @@ export default function SettlementsPage() {
   // Computed values
   const balances = computeMemberBalances(members, transactions, participants, settlements);
   const suggestedSettlements = computeSettlements(balances);
-  const pairwiseDebts = computePairwiseDebts(members, transactions, participants, settlements);
+  const pairwiseDebts = computePairwiseDebts(members, transactions, participants);
   const memberMap = new Map(members.map((m) => [m.id, m]));
 
   const totalDebt = pairwiseDebts.reduce((sum, d) => sum + d.amount, 0);
@@ -146,7 +146,7 @@ export default function SettlementsPage() {
   const totalExpenses = transactions.reduce((sum, t) => sum + t.amount, 0);
 
   // Resolution progress: how much of the original debt has been settled
-  const originalTotalDebt = computePairwiseDebts(members, transactions, participants, []).reduce(
+  const originalTotalDebt = computePairwiseDebts(members, transactions, participants).reduce(
     (sum, d) => sum + d.amount,
     0
   );
