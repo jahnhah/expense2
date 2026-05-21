@@ -3,20 +3,20 @@
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getCurrencySymbol } from '@/lib/types';
-import type { MemberBalance } from '@/lib/types';
-import { computeSettlements } from '@/lib/calculations';
+import type { MemberBalance, SuggestedSettlement } from '@/services/dashboard.service';
 import { round } from '@/lib/formula-engine';
 import { cn } from '@/lib/utils';
 import { TrendingUp, TrendingDown, Minus, ArrowRight, ArrowRightLeft } from 'lucide-react';
 
 interface BalanceTableProps {
   balances: MemberBalance[];
+  suggestedSettlements: SuggestedSettlement[];
   currency: string;
   householdId: string;
 }
 
-function MemberAvatar({ member }: { member: MemberBalance['member'] }) {
-  const initials = member.name
+function MemberAvatar({ name, color }: { name: string; color: string }) {
+  const initials = name
     .split(' ')
     .map((w) => w[0])
     .join('')
@@ -26,17 +26,15 @@ function MemberAvatar({ member }: { member: MemberBalance['member'] }) {
   return (
     <div
       className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-      style={{ backgroundColor: member.color }}
+      style={{ backgroundColor: color }}
     >
       {initials}
     </div>
   );
 }
 
-export function BalanceTable({ balances, currency, householdId }: BalanceTableProps) {
+export function BalanceTable({ balances, suggestedSettlements, currency, householdId }: BalanceTableProps) {
   const sym = getCurrencySymbol(currency);
-  const settlements = computeSettlements(balances);
-  const memberMap = new Map(balances.map((b) => [b.member.id, b.member]));
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
@@ -91,13 +89,13 @@ export function BalanceTable({ balances, currency, householdId }: BalanceTablePr
 
                     return (
                       <tr
-                        key={b.member.id}
+                        key={b.memberId}
                         className="border-b border-border/50 hover:bg-muted/30 transition-colors"
                       >
                         <td className="px-5 py-3.5">
                           <div className="flex items-center gap-2.5">
-                            <MemberAvatar member={b.member} />
-                            <span className="font-medium text-foreground">{b.member.name}</span>
+                            <MemberAvatar name={b.name} color={b.color} />
+                            <span className="font-medium text-foreground">{b.name}</span>
                           </div>
                         </td>
                         <td className="text-right px-3 py-3.5 text-foreground font-mono text-xs">
@@ -155,7 +153,7 @@ export function BalanceTable({ balances, currency, householdId }: BalanceTablePr
           </div>
         </CardHeader>
         <CardContent>
-          {settlements.length === 0 ? (
+          {suggestedSettlements.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center mb-3">
                 <TrendingUp className="w-5 h-5 text-emerald-500" />
@@ -165,40 +163,34 @@ export function BalanceTable({ balances, currency, householdId }: BalanceTablePr
             </div>
           ) : (
             <div className="space-y-3">
-              {settlements.map((s, i) => {
-                const from = memberMap.get(s.from);
-                const to = memberMap.get(s.to);
-                if (!from || !to) return null;
-
-                return (
+              {suggestedSettlements.map((s, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-2 p-3 rounded-lg bg-muted/40 border border-border/50"
+                >
                   <div
-                    key={i}
-                    className="flex items-center gap-2 p-3 rounded-lg bg-muted/40 border border-border/50"
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                    style={{ backgroundColor: balances.find(b => b.memberId === s.fromMemberId)?.color ?? '#6B7280' }}
                   >
-                    <div
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-                      style={{ backgroundColor: from.color }}
-                    >
-                      {from.name[0]}
-                    </div>
-                    <ArrowRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                    <div
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-                      style={{ backgroundColor: to.color }}
-                    >
-                      {to.name[0]}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-muted-foreground truncate">
-                        {from.name} → {to.name}
-                      </p>
-                    </div>
-                    <span className="text-sm font-bold text-foreground shrink-0">
-                      {sym}{s.amount}
-                    </span>
+                    {s.fromName[0]}
                   </div>
-                );
-              })}
+                  <ArrowRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  <div
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                    style={{ backgroundColor: balances.find(b => b.memberId === s.toMemberId)?.color ?? '#6B7280' }}
+                  >
+                    {s.toName[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground truncate">
+                      {s.fromName} → {s.toName}
+                    </p>
+                  </div>
+                  <span className="text-sm font-bold text-foreground shrink-0">
+                    {sym}{s.amount}
+                  </span>
+                </div>
+              ))}
             </div>
           )}
         </CardContent>

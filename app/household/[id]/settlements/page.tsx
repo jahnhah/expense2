@@ -1,12 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 import { useHousehold } from '@/lib/household-context';
-import type { Member, Transaction, TransactionParticipant, Category, Settlement } from '@/lib/types';
 import { getCurrencySymbol } from '@/lib/types';
-import { computeMemberBalances, computeSettlements, computePairwiseDebts } from '@/lib/calculations';
+import { useSettlements } from '@/hooks/use-settlements';
 import { round } from '@/lib/formula-engine';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,11 +40,7 @@ export default function SettlementsPage() {
   const household = useHousehold();
   const sym = getCurrencySymbol(household.currency);
 
-  const [members, setMembers] = useState<Member[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [participants, setParticipants] = useState<TransactionParticipant[]>([]);
-  const [settlements, setSettlements] = useState<Settlement[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading, error, recordSettlement, deleteSettlement } = useSettlements(householdId);
 
   // Record settlement modal
   const [showRecord, setShowRecord] = useState(false);
@@ -63,44 +57,6 @@ export default function SettlementsPage() {
   // Expanded debts
   const [expandedDebt, setExpandedDebt] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const [membersRes, txRes, settlementsRes] = await Promise.all([
-      supabase.from('members').select('*').eq('household_id', householdId).order('created_at'),
-      supabase
-        .from('transactions')
-        .select('*')
-        .eq('household_id', householdId)
-        .order('date', { ascending: false }),
-      supabase
-        .from('settlements')
-        .select('*')
-        .eq('household_id', householdId)
-        .order('date', { ascending: false }),
-    ]);
-
-    const txIds = (txRes.data ?? []).map((t) => t.id);
-    let parts: TransactionParticipant[] = [];
-    if (txIds.length > 0) {
-      const { data } = await supabase
-        .from('transaction_participants')
-        .select('*')
-        .in('transaction_id', txIds);
-      parts = data ?? [];
-    }
-
-    setMembers(membersRes.data ?? []);
-    setTransactions(txRes.data ?? []);
-    setParticipants(parts);
-    setSettlements(settlementsRes.data ?? []);
-    setLoading(false);
-  }, [householdId]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  // Initialize record form when opening
   function openRecord(fromId?: string, toId?: string, amount?: number) {
     setRecordFrom(fromId ?? '');
     setRecordTo(toId ?? '');
@@ -113,46 +69,16 @@ export default function SettlementsPage() {
   async function saveSettlement() {
     if (!recordFrom || !recordTo || !recordAmount || recordFrom === recordTo) return;
     setSaving(true);
-
-    await supabase.from('settlements').insert({
-      household_id: householdId,
-      from_member_id: recordFrom,
-      to_member_id: recordTo,
-      amount: parseFloat(recordAmount),
-      date: recordDate,
-      note: recordNote.trim(),
-    });
-
+    await recordSettlement(recordFrom, recordTo, parseFloat(recordAmount), recordDate, recordNote);
     setSaving(false);
     setShowRecord(false);
-    load();
   }
 
-  async function deleteSettlement() {
+  async function handleDelete() {
     if (!deleteId) return;
-    await supabase.from('settlements').delete().eq('id', deleteId);
+    await deleteSettlement(deleteId);
     setDeleteId(null);
-    load();
   }
-
-  // Computed values
-  const balances = computeMemberBalances(members, transactions, participants, settlements);
-  const suggestedSettlements = computeSettlements(balances);
-  const pairwiseDebts = computePairwiseDebts(members, transactions, participants);
-  const memberMap = new Map(members.map((m) => [m.id, m]));
-
-  const totalDebt = pairwiseDebts.reduce((sum, d) => sum + d.amount, 0);
-  const totalSettled = settlements.reduce((sum, s) => sum + s.amount, 0);
-  const totalExpenses = transactions.reduce((sum, t) => sum + t.amount, 0);
-
-  // Resolution progress: how much of the original debt has been settled
-  const originalTotalDebt = computePairwiseDebts(members, transactions, participants).reduce(
-    (sum, d) => sum + d.amount,
-    0
-  );
-  const resolutionProgress = originalTotalDebt > 0
-    ? Math.min(100, round((totalSettled / originalTotalDebt) * 100, 1))
-    : 100;
 
   if (loading) {
     return (
@@ -161,6 +87,27 @@ export default function SettlementsPage() {
       </div>
     );
   }
+
+  if (error || !data) {
+    return (
+      <div className="flex items-center justify-center h-64 text-destructive text-sm">
+        {error ?? 'No data available'}
+      </div>
+    );
+  }
+
+  const {
+    members,
+    settlements,
+    balances,
+    suggestedSettlements,
+    pairwiseDebts,
+    totalSettled,
+    totalOutstanding,
+    resolutionProgress,
+  } = data;
+
+  const memberMap = new Map(members.map((m) => [m.id, m]));
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -188,7 +135,7 @@ export default function SettlementsPage() {
               Total Outstanding
             </p>
             <p className="text-2xl font-bold text-foreground mt-1">
-              {sym}{round(totalDebt, 2)}
+              {sym}{round(totalOutstanding, 2)}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
               Across {pairwiseDebts.length} debt{pairwiseDebts.length !== 1 ? 's' : ''}
@@ -268,18 +215,18 @@ export default function SettlementsPage() {
 
                     return (
                       <tr
-                        key={b.member.id}
+                        key={b.memberId}
                         className="border-b border-border/50 hover:bg-muted/30 transition-colors"
                       >
                         <td className="px-5 py-3.5">
                           <div className="flex items-center gap-2.5">
                             <div
                               className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-                              style={{ backgroundColor: b.member.color }}
+                              style={{ backgroundColor: b.color }}
                             >
-                              {b.member.name[0]}
+                              {b.name[0]}
                             </div>
-                            <span className="font-medium text-foreground">{b.member.name}</span>
+                            <span className="font-medium text-foreground">{b.name}</span>
                           </div>
                         </td>
                         <td className="text-right px-3 py-3.5 text-foreground font-mono text-xs">
@@ -345,7 +292,7 @@ export default function SettlementsPage() {
           ) : (
             <div className="space-y-3">
               {pairwiseDebts.map((debt) => {
-                const key = `${debt.from.id}->${debt.to.id}`;
+                const key = `${debt.fromMemberId}->${debt.toMemberId}`;
                 const isExpanded = expandedDebt === key;
 
                 return (
@@ -353,25 +300,24 @@ export default function SettlementsPage() {
                     key={key}
                     className="rounded-xl border border-border bg-card"
                   >
-                    {/* Debt header */}
                     <div className="flex items-center gap-3 p-4">
                       <div
                         className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-                        style={{ backgroundColor: debt.from.color }}
+                        style={{ backgroundColor: debt.fromColor }}
                       >
-                        {debt.from.name[0]}
+                        {debt.fromName[0]}
                       </div>
                       <ArrowRight className="w-4 h-4 text-muted-foreground shrink-0" />
                       <div
                         className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-                        style={{ backgroundColor: debt.to.color }}
+                        style={{ backgroundColor: debt.toColor }}
                       >
-                        {debt.to.name[0]}
+                        {debt.toName[0]}
                       </div>
 
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground">
-                          {debt.from.name} owes {debt.to.name}
+                          {debt.fromName} owes {debt.toName}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {debt.transactions.length} transaction{debt.transactions.length !== 1 ? 's' : ''}
@@ -389,7 +335,7 @@ export default function SettlementsPage() {
                           variant="outline"
                           size="sm"
                           className="gap-1.5 text-xs h-7"
-                          onClick={() => openRecord(debt.from.id, debt.to.id, debt.amount)}
+                          onClick={() => openRecord(debt.fromMemberId, debt.toMemberId, debt.amount)}
                         >
                           <HandCoins className="w-3 h-3" />
                           Settle
@@ -409,11 +355,10 @@ export default function SettlementsPage() {
                       </div>
                     </div>
 
-                    {/* Expanded: transaction breakdown */}
                     {isExpanded && (
                       <div className="px-4 pb-4 border-t border-border/50 pt-3">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                          Why {debt.from.name} owes {sym}{debt.amount}
+                          Why {debt.fromName} owes {sym}{debt.amount}
                         </p>
                         <div className="space-y-2">
                           {debt.transactions.map((tx, i) => (
@@ -466,43 +411,37 @@ export default function SettlementsPage() {
               Minimum transfers needed to settle all debts
             </p>
             <div className="space-y-3">
-              {suggestedSettlements.map((s, i) => {
-                const from = memberMap.get(s.from);
-                const to = memberMap.get(s.to);
-                if (!from || !to) return null;
-
-                return (
+              {suggestedSettlements.map((s, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-3 p-4 rounded-xl border border-dashed border-border bg-muted/20"
+                >
                   <div
-                    key={i}
-                    className="flex items-center gap-3 p-4 rounded-xl border border-dashed border-border bg-muted/20"
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                    style={{ backgroundColor: memberMap.get(s.fromMemberId)?.color ?? '#6B7280' }}
                   >
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-                      style={{ backgroundColor: from.color }}
-                    >
-                      {from.name[0]}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-foreground">{from.name}</span>
-                        <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
-                        <span className="text-sm font-medium text-foreground">{to.name}</span>
-                      </div>
-                    </div>
-                    <span className="text-lg font-bold text-foreground shrink-0">
-                      {sym}{s.amount}
-                    </span>
-                    <Button
-                      size="sm"
-                      className="gap-1.5 h-7"
-                      onClick={() => openRecord(s.from, s.to, s.amount)}
-                    >
-                      <HandCoins className="w-3 h-3" />
-                      Pay
-                    </Button>
+                    {s.fromName[0]}
                   </div>
-                );
-              })}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-foreground">{s.fromName}</span>
+                      <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
+                      <span className="text-sm font-medium text-foreground">{s.toName}</span>
+                    </div>
+                  </div>
+                  <span className="text-lg font-bold text-foreground shrink-0">
+                    {sym}{s.amount}
+                  </span>
+                  <Button
+                    size="sm"
+                    className="gap-1.5 h-7"
+                    onClick={() => openRecord(s.fromMemberId, s.toMemberId, s.amount)}
+                  >
+                    <HandCoins className="w-3 h-3" />
+                    Pay
+                  </Button>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
@@ -643,20 +582,16 @@ export default function SettlementsPage() {
                 onChange={(e) => setRecordAmount(e.target.value)}
                 className="font-mono"
               />
-              {/* Show suggested amount */}
-              {recordFrom && recordTo && (
-                <div className="text-xs text-muted-foreground">
-                  {(() => {
-                    const debt = pairwiseDebts.find(
-                      (d) => d.from.id === recordFrom && d.to.id === recordTo
-                    );
-                    if (debt) {
-                      return `Outstanding debt: ${sym}${debt.amount}`;
-                    }
-                    return 'No outstanding debt in this direction';
-                  })()}
-                </div>
-              )}
+              {recordFrom && recordTo && (() => {
+                const debt = pairwiseDebts.find(
+                  (d) => d.fromMemberId === recordFrom && d.toMemberId === recordTo
+                );
+                return (
+                  <p className="text-xs text-muted-foreground">
+                    {debt ? `Outstanding debt: ${sym}${debt.amount}` : 'No outstanding debt in this direction'}
+                  </p>
+                );
+              })()}
             </div>
             <div className="space-y-2">
               <Label>Date</Label>
@@ -712,7 +647,7 @@ export default function SettlementsPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={deleteSettlement}
+              onClick={handleDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete
