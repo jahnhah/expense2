@@ -15,23 +15,11 @@ import {
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getCurrencySymbol } from '@/lib/types';
-import type { Member } from '@/lib/types';
+import type { CategoryBreakdown, MemberSpending } from '@/services/dashboard.service';
 import { round } from '@/lib/formula-engine';
 
-interface CategoryData {
-  name: string;
-  color: string;
-  total: number;
-}
-
-interface MemberSpending {
-  member: Member;
-  paid: number;
-  owed: number;
-}
-
 interface ExpenseChartsProps {
-  categoryData: CategoryData[];
+  categoryData: CategoryBreakdown[];
   memberSpending: MemberSpending[];
   currency: string;
 }
@@ -40,10 +28,10 @@ export function ExpenseCharts({ categoryData, memberSpending, currency }: Expens
   const sym = getCurrencySymbol(currency);
 
   const barData = memberSpending.map((ms) => ({
-    name: ms.member.name,
+    name: ms.name,
     Paid: round(ms.paid, 2),
     Share: round(ms.owed, 2),
-    fill: ms.member.color,
+    fill: ms.color,
   }));
 
   const pieData = categoryData.filter((c) => c.total > 0);

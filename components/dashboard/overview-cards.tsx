@@ -2,7 +2,7 @@
 
 import { Card, CardContent } from '@/components/ui/card';
 import { getCurrencySymbol } from '@/lib/types';
-import type { MemberBalance } from '@/lib/types';
+import type { MemberBalance } from '@/services/dashboard.service';
 import { TrendingUp, TrendingDown, Receipt, Users, DollarSign } from 'lucide-react';
 import { round } from '@/lib/formula-engine';
 
@@ -46,7 +46,7 @@ export function OverviewCards({
     {
       label: 'Largest Debt',
       value: topDebtor ? `${sym}${Math.abs(round(topDebtor.balance, 2))}` : `${sym}0`,
-      sublabel: topDebtor ? `${topDebtor.member.name} owes` : 'Fully settled',
+      sublabel: topDebtor ? `${topDebtor.name} owes` : 'Fully settled',
       icon: TrendingDown,
       color: 'text-red-500',
       bg: 'bg-red-500/10',
@@ -54,7 +54,7 @@ export function OverviewCards({
     {
       label: 'Largest Credit',
       value: topCreditor ? `${sym}${round(topCreditor.balance, 2)}` : `${sym}0`,
-      sublabel: topCreditor ? `${topCreditor.member.name} is owed` : 'Fully settled',
+      sublabel: topCreditor ? `${topCreditor.name} is owed` : 'Fully settled',
       icon: TrendingUp,
       color: 'text-emerald-500',
       bg: 'bg-emerald-500/10',

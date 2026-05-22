@@ -114,6 +114,7 @@ export const CURRENCIES = [
   { code: 'CAD', symbol: 'CA$', name: 'Canadian Dollar' },
   { code: 'AUD', symbol: 'A$', name: 'Australian Dollar' },
   { code: 'MGA', symbol: 'Ar', name: 'Malagasy Ariary' },
+  { code: 'MUR', symbol: 'Rs', name: 'Mauritian Rupee' },
 ];
 
 export function getCurrencySymbol(code: string): string {

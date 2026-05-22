@@ -154,8 +154,7 @@ export interface PairwiseDebt {
 export function computePairwiseDebts(
   members: Member[],
   transactions: Transaction[],
-  participants: TransactionParticipant[],
-  settlements: Settlement[] = []
+  participants: TransactionParticipant[]
 ): PairwiseDebt[] {
   const memberMap = new Map(members.map((m) => [m.id, m]));
 
@@ -183,14 +182,6 @@ export function computePairwiseDebts(
         date: tx.date,
         share: p.computed_share ?? 0,
       });
-    }
-  }
-
-  // Subtract settlements
-  for (const s of settlements) {
-    const key = `${s.from_member_id}->${s.to_member_id}`;
-    if (debtTotals[key] !== undefined) {
-      debtTotals[key] -= s.amount;
     }
   }
 
