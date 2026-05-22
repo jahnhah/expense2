@@ -52,8 +52,8 @@ AS $$
     ROUND(
       COALESCE(paid.total, 0)
       - COALESCE(owed.total, 0)
-      + COALESCE(received.total, 0)
-      - COALESCE(reimbursed.total, 0),
+      - COALESCE(received.total, 0)
+      + COALESCE(reimbursed.total, 0),
     2)                                                 AS balance
   FROM members m
 
@@ -240,8 +240,9 @@ $$;
 
 -- ─────────────────────────────────────────────
 -- 5. get_pairwise_debts
---    For each (debtor → creditor) pair, returns total owed and a JSONB
---    array of the contributing transactions for drill-down display.
+--    For each (debtor → creditor) pair, returns total owed minus any
+--    settlements already made, and a JSONB array of contributing
+--    transactions for drill-down display.
 -- ─────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION get_pairwise_debts(p_household_id uuid)
 RETURNS TABLE (
@@ -264,7 +265,9 @@ AS $$
     t.payer_id                                                  AS to_member_id,
     tm.name                                                     AS to_name,
     tm.color                                                    AS to_color,
-    ROUND(SUM(tp.computed_share), 2)                            AS amount,
+    ROUND(
+      SUM(tp.computed_share) - COALESCE(SUM(s.amount), 0),
+    2)                                                          AS amount,
     jsonb_agg(
       jsonb_build_object(
         'title', t.title,
@@ -277,12 +280,15 @@ AS $$
   JOIN transactions t  ON t.id  = tp.transaction_id
   JOIN members      fm ON fm.id = tp.member_id
   JOIN members      tm ON tm.id = t.payer_id
+  LEFT JOIN settlements s ON s.household_id = t.household_id
+    AND s.from_member_id = tp.member_id
+    AND s.to_member_id = t.payer_id
   WHERE t.household_id = p_household_id
     AND tp.member_id  <> t.payer_id   -- exclude self-pay rows
     AND t.payer_id IS NOT NULL
   GROUP BY tp.member_id, fm.name, fm.color, t.payer_id, tm.name, tm.color
-  HAVING SUM(tp.computed_share) > 0.01
-  ORDER BY SUM(tp.computed_share) DESC;
+  HAVING SUM(tp.computed_share) - COALESCE(SUM(s.amount), 0) > 0.01
+  ORDER BY SUM(tp.computed_share) - COALESCE(SUM(s.amount), 0) DESC;
 $$;
 
 CREATE OR REPLACE FUNCTION get_total_expenses(p_household_id uuid)
