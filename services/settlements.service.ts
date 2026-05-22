@@ -46,11 +46,7 @@ export const SettlementsService = {
       supabase.rpc('get_member_balances',       { p_household_id: householdId }),
       supabase.rpc('get_suggested_settlements', { p_household_id: householdId }),
       supabase.rpc('get_pairwise_debts',        { p_household_id: householdId }),
-      supabase
-        .from('transactions')
-        .select('amount.sum()')
-        .eq('household_id', householdId)
-        .single(),
+      supabase.rpc('get_total_expenses',        { p_household_id: householdId }),
     ]);
 
     const settlements: Settlement[] = settlementsRes.data ?? [];
