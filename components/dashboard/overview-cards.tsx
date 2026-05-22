@@ -23,8 +23,24 @@ export function OverviewCards({
 }: OverviewCardsProps) {
   const sym = getCurrencySymbol(currency);
   const maxOwed = Math.max(...balances.map((b) => Math.abs(b.balance)), 0);
-  const topDebtor = balances.find((b) => Math.abs(b.balance) === maxOwed && b.balance < -0.01);
-  const topCreditor = balances.find((b) => Math.abs(b.balance) === maxOwed && b.balance > 0.01);
+  const topDebtor = balances.reduce<MemberBalance | undefined>((min, b) => {
+    if (b.balance >= 0) return min;
+
+    if (!min || b.balance < min.balance) {
+      return b;
+    }
+
+    return min;
+  }, undefined);
+  const topCreditor = balances.reduce<MemberBalance | undefined>((max, b) => {
+    if (b.balance <= 0) return max;
+
+    if (!max || b.balance > max.balance) {
+      return b;
+    }
+
+    return max;
+  }, undefined);
 
   const cards = [
     {
