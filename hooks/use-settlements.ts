@@ -14,6 +14,7 @@ interface UseSettlementsResult {
     amount: number,
     date: string,
     note: string,
+    transactionId?: string,
   ) => Promise<void>;
   deleteSettlement: (id: string) => Promise<void>;
 }
@@ -41,8 +42,23 @@ export function useSettlements(householdId: string): UseSettlementsResult {
   }, [load]);
 
   const recordSettlement = useCallback(
-    async (fromMemberId: string, toMemberId: string, amount: number, date: string, note: string) => {
-      await SettlementsService.recordSettlement(householdId, fromMemberId, toMemberId, amount, date, note);
+    async (
+      fromMemberId: string,
+      toMemberId: string,
+      amount: number,
+      date: string,
+      note: string,
+      transactionId?: string,
+    ) => {
+      await SettlementsService.recordSettlement(
+        householdId,
+        fromMemberId,
+        toMemberId,
+        amount,
+        date,
+        note,
+        transactionId,
+      );
       await load();
     },
     [householdId, load],

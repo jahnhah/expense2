@@ -358,26 +358,79 @@ export default function SettlementsPage() {
                     {isExpanded && (
                       <div className="px-4 pb-4 border-t border-border/50 pt-3">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                          Why {debt.fromName} owes {sym}{debt.amount}
+                          Outstanding transaction details for {debt.fromName}
                         </p>
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                           {debt.transactions.map((tx, i) => (
-                            <div
-                              key={i}
-                              className="flex items-center justify-between p-2.5 rounded-lg bg-muted/30"
-                            >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 shrink-0" />
-                                <span className="text-sm text-foreground truncate">{tx.title}</span>
+                            <div key={i} className="rounded-xl border border-border/70 bg-muted/30 p-4">
+                              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                <div className="min-w-0">
+                                  <p className="text-sm font-semibold text-foreground truncate">{tx.title}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {format(new Date(tx.date), 'MMM d, yyyy')}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-sm font-semibold text-red-500">
+                                    Remaining: {sym}{round(tx.remaining, 2)}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {debt.fromName} still owes {debt.toName} for this transaction
+                                  </p>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-3 shrink-0">
-                                <span className="text-xs text-muted-foreground">
-                                  {format(new Date(tx.date), 'MMM d, yyyy')}
-                                </span>
-                                <span className="text-sm font-semibold text-foreground font-mono">
-                                  {sym}{round(tx.share, 2)}
-                                </span>
+
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4 text-xs text-muted-foreground">
+                                <div className="rounded-lg border border-border/50 bg-background p-3">
+                                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Computed Share</p>
+                                  <p className="mt-1 font-semibold text-foreground font-mono">
+                                    {sym}{round(tx.computedShare, 2)}
+                                  </p>
+                                </div>
+                                <div className="rounded-lg border border-border/50 bg-background p-3">
+                                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Paid Amount</p>
+                                  <p className="mt-1 font-semibold text-foreground font-mono">
+                                    {sym}{round(tx.paidAmount, 2)}
+                                  </p>
+                                </div>
+                                <div className="rounded-lg border border-border/50 bg-background p-3">
+                                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Remaining</p>
+                                  <p className="mt-1 font-semibold text-red-500 font-mono">
+                                    {sym}{round(tx.remaining, 2)}
+                                  </p>
+                                </div>
                               </div>
+
+                              {tx.payments.length > 0 ? (
+                                <div className="mt-4 border-t border-border/50 pt-3 text-sm text-foreground">
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Payments</p>
+                                  <div className="space-y-2">
+                                    {tx.payments.map((payment, j) => (
+                                      <div key={j} className="rounded-lg border border-border/50 bg-background p-3">
+                                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                          <p className="font-medium">
+                                            {sym}{round(payment.amount, 2)} paid by {debt.fromName}
+                                          </p>
+                                          <span className="text-xs text-muted-foreground">
+                                            {format(new Date(payment.date), 'MMM d, yyyy')}
+                                          </span>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                          {payment.note || 'Recorded settlement payment'}
+                                        </p>
+                                        <div className="text-[11px] text-muted-foreground mt-2 flex flex-wrap gap-2">
+                                          {payment.settlementId && <span>Settlement: {payment.settlementId}</span>}
+                                          {payment.transactionId && <span>Transaction: {payment.transactionId}</span>}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="mt-4 text-sm text-muted-foreground">
+                                  No payment records available for this transaction participant yet.
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>

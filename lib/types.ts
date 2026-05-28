@@ -43,6 +43,8 @@ export interface TransactionParticipant {
   formula: string;
   computed_value: number | null;
   computed_share: number | null;
+  paid_amount: number | null;
+  is_paid: boolean;
   created_at: string;
 }
 
@@ -57,6 +59,7 @@ export interface Settlement {
   household_id: string;
   from_member_id: string;
   to_member_id: string;
+  transaction_id?: string | null;
   amount: number;
   date: string;
   note: string;

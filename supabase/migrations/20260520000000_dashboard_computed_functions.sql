@@ -259,15 +259,19 @@ LANGUAGE sql
 STABLE
 AS $$
   SELECT
-    tp.member_id                                                AS from_member_id,
-    fm.name                                                     AS from_name,
-    fm.color                                                    AS from_color,
-    t.payer_id                                                  AS to_member_id,
-    tm.name                                                     AS to_name,
-    tm.color                                                    AS to_color,
+    tp.member_id AS from_member_id,
+    fm.name      AS from_name,
+    fm.color     AS from_color,
+
+    t.payer_id   AS to_member_id,
+    tm.name      AS to_name,
+    tm.color     AS to_color,
+
     ROUND(
       SUM(tp.computed_share) - COALESCE(SUM(s.amount), 0),
-    2)                                                          AS amount,
+      2
+    ) AS amount,
+
     jsonb_agg(
       jsonb_build_object(
         'title', t.title,
@@ -275,20 +279,42 @@ AS $$
         'share', ROUND(tp.computed_share, 2)
       )
       ORDER BY t.date DESC
-    )                                                           AS transactions
+    ) AS transactions
+
   FROM transaction_participants tp
-  JOIN transactions t  ON t.id  = tp.transaction_id
-  JOIN members      fm ON fm.id = tp.member_id
-  JOIN members      tm ON tm.id = t.payer_id
-  LEFT JOIN settlements s ON s.household_id = t.household_id
+
+  JOIN transactions t
+    ON t.id = tp.transaction_id
+
+  JOIN members fm
+    ON fm.id = tp.member_id
+
+  JOIN members tm
+    ON tm.id = t.payer_id
+
+  LEFT JOIN settlements s
+    ON s.household_id = t.household_id
     AND s.from_member_id = tp.member_id
     AND s.to_member_id = t.payer_id
+
   WHERE t.household_id = p_household_id
-    AND tp.member_id  <> t.payer_id   -- exclude self-pay rows
+    AND tp.member_id <> t.payer_id
     AND t.payer_id IS NOT NULL
-  GROUP BY tp.member_id, fm.name, fm.color, t.payer_id, tm.name, tm.color
-  HAVING SUM(tp.computed_share) - COALESCE(SUM(s.amount), 0) > 0.01
-  ORDER BY SUM(tp.computed_share) - COALESCE(SUM(s.amount), 0) DESC;
+    AND tp.is_paid = false
+
+  GROUP BY
+    tp.member_id,
+    fm.name,
+    fm.color,
+    t.payer_id,
+    tm.name,
+    tm.color
+
+  HAVING
+    SUM(tp.computed_share) - COALESCE(SUM(s.amount), 0) > 0.01
+
+  ORDER BY
+    SUM(tp.computed_share) - COALESCE(SUM(s.amount), 0) DESC;
 $$;
 
 CREATE OR REPLACE FUNCTION get_total_expenses(p_household_id uuid)

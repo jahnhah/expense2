@@ -2,6 +2,24 @@ import { supabase } from '@/lib/supabase';
 import type { Member, Settlement } from '@/lib/types';
 import type { MemberBalance, SuggestedSettlement } from './dashboard.service';
 
+export interface DebtPayment {
+  amount: number;
+  date: string;
+  note: string;
+  settlementId?: string;
+  transactionId?: string | null;
+}
+
+export interface DebtTransaction {
+  title: string;
+  date: string;
+  share: number;
+  computedShare: number;
+  paidAmount: number;
+  remaining: number;
+  payments: DebtPayment[];
+}
+
 export interface PairwiseDebt {
   fromMemberId: string;
   fromName: string;
@@ -10,7 +28,7 @@ export interface PairwiseDebt {
   toName: string;
   toColor: string;
   amount: number;
-  transactions: { title: string; date: string; share: number }[];
+  transactions: DebtTransaction[];
 }
 
 export interface SettlementsData {
@@ -78,7 +96,30 @@ export const SettlementsService = {
       toName:       r.to_name as string,
       toColor:      r.to_color as string,
       amount:       Number(r.amount),
-      transactions: (r.transactions as { title: string; date: string; share: number }[]) ?? [],
+      transactions: (r.transactions as {
+        title: string;
+        date: string;
+        share: number;
+        computed_share: number;
+        paid_amount: number;
+        remaining: number;
+        payments: Array<{ amount: number; date: string; note: string; settlement_id?: string; transaction_id?: string | null }>;
+      }[])
+        .map((tx) => ({
+          title: tx.title,
+          date: tx.date,
+          share: tx.share,
+          computedShare: tx.computed_share,
+          paidAmount: tx.paid_amount,
+          remaining: tx.remaining,
+          payments: (tx.payments ?? []).map((payment) => ({
+            amount: payment.amount,
+            date: payment.date,
+            note: payment.note,
+            settlementId: payment.settlement_id,
+            transactionId: payment.transaction_id,
+          })),
+        })) ?? [],
     }));
 
     const totalExpenses = Number((totalExpensesRes.data as { sum: number } | null)?.sum ?? 0);
@@ -109,14 +150,16 @@ export const SettlementsService = {
     amount: number,
     date: string,
     note: string,
+    transactionId?: string,
   ) => {
-    return supabase.from('settlements').insert({
-      household_id:   householdId,
-      from_member_id: fromMemberId,
-      to_member_id:   toMemberId,
-      amount,
-      date,
-      note: note.trim(),
+    return supabase.rpc('record_settlement', {
+      p_household_id:   householdId,
+      p_from_member_id: fromMemberId,
+      p_to_member_id:   toMemberId,
+      p_amount:         amount,
+      p_date:           date,
+      p_note:           note.trim(),
+      p_transaction_id: transactionId ?? null,
     });
   },
 

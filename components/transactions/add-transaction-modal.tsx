@@ -183,6 +183,8 @@ export function AddTransactionModal({
           formula: includedParticipants.find((p) => p.memberId === s.memberId)?.formula ?? '1',
           computed_value: s.computedValue,
           computed_share: s.computedShare,
+          is_paid: txData.payer_id === s.memberId ? true : false,
+          paid_amount: txData.payer_id === s.memberId ? s.computedShare : 0,
         }))
       );
     }
