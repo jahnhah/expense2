@@ -54,8 +54,9 @@ export default function SettlementsPage() {
   // Delete settlement
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  // Expanded debts
+  // Expanded debts - track debt pair and selected transaction index
   const [expandedDebt, setExpandedDebt] = useState<string | null>(null);
+  const [selectedTransactionIndex, setSelectedTransactionIndex] = useState<number | null>(null);
 
   function openRecord(fromId?: string, toId?: string, amount?: number) {
     setRecordFrom(fromId ?? '');
@@ -291,15 +292,13 @@ export default function SettlementsPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {pairwiseDebts.map((debt) => {
+              {pairwiseDebts.map((debt: any) => {
                 const key = `${debt.fromMemberId}->${debt.toMemberId}`;
                 const isExpanded = expandedDebt === key;
+                const transaction_details = debt.transaction_details ?? {};
 
                 return (
-                  <div
-                    key={key}
-                    className="rounded-xl border border-border bg-card"
-                  >
+                  <div key={key} className="rounded-xl border border-border bg-card">
                     <div className="flex items-center gap-3 p-4">
                       <div
                         className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
@@ -318,9 +317,6 @@ export default function SettlementsPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground">
                           {debt.fromName} owes {debt.toName}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {debt.transactions.length} transaction{debt.transactions.length !== 1 ? 's' : ''}
                         </p>
                       </div>
 
@@ -344,7 +340,10 @@ export default function SettlementsPage() {
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7"
-                          onClick={() => setExpandedDebt(isExpanded ? null : key)}
+                          onClick={() => {
+                            setExpandedDebt(isExpanded ? null : key);
+                            setSelectedTransactionIndex(isExpanded ? null : 0);
+                          }}
                         >
                           {isExpanded ? (
                             <ChevronUp className="w-3.5 h-3.5" />
@@ -358,87 +357,35 @@ export default function SettlementsPage() {
                     {isExpanded && (
                       <div className="px-4 pb-4 border-t border-border/50 pt-3">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                          Outstanding transaction details for {debt.fromName}
+                          Select transaction for details
                         </p>
-                        <div className="space-y-3">
-                          {debt.transactions.map((tx, i) => (
-                            <div key={i} className="rounded-xl border border-border/70 bg-muted/30 p-4">
-                              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                                <div className="min-w-0">
-                                  <p className="text-sm font-semibold text-foreground truncate">{tx.title}</p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {format(new Date(tx.date), 'MMM d, yyyy')}
-                                  </p>
-                                </div>
-                                <div className="text-right">
-                                  <p className="text-sm font-semibold text-red-500">
-                                    Remaining: {sym}{round(tx.remaining, 2)}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {debt.fromName} still owes {debt.toName} for this transaction
-                                  </p>
-                                </div>
-                              </div>
-
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4 text-xs text-muted-foreground">
-                                <div className="rounded-lg border border-border/50 bg-background p-3">
-                                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Computed Share</p>
-                                  <p className="mt-1 font-semibold text-foreground font-mono">
-                                    {sym}{round(tx.computedShare, 2)}
-                                  </p>
-                                </div>
-                                <div className="rounded-lg border border-border/50 bg-background p-3">
-                                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Paid Amount</p>
-                                  <p className="mt-1 font-semibold text-foreground font-mono">
-                                    {sym}{round(tx.paidAmount, 2)}
-                                  </p>
-                                </div>
-                                <div className="rounded-lg border border-border/50 bg-background p-3">
-                                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Remaining</p>
-                                  <p className="mt-1 font-semibold text-red-500 font-mono">
-                                    {sym}{round(tx.remaining, 2)}
-                                  </p>
-                                </div>
-                              </div>
-
-                              {tx.payments.length > 0 ? (
-                                <div className="mt-4 border-t border-border/50 pt-3 text-sm text-foreground">
-                                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Payments</p>
-                                  <div className="space-y-2">
-                                    {tx.payments.map((payment, j) => (
-                                      <div key={j} className="rounded-lg border border-border/50 bg-background p-3">
-                                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                                          <p className="font-medium">
-                                            {sym}{round(payment.amount, 2)} paid by {debt.fromName}
-                                          </p>
-                                          <span className="text-xs text-muted-foreground">
-                                            {format(new Date(payment.date), 'MMM d, yyyy')}
-                                          </span>
-                                        </div>
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                          {payment.note || 'Recorded settlement payment'}
-                                        </p>
-                                        <div className="text-[11px] text-muted-foreground mt-2 flex flex-wrap gap-2">
-                                          {payment.settlementId && <span>Settlement: {payment.settlementId}</span>}
-                                          {payment.transactionId && <span>Transaction: {payment.transactionId}</span>}
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="mt-4 text-sm text-muted-foreground">
-                                  No payment records available for this transaction participant yet.
-                                </div>
-                              )}
+                        <div className="rounded-xl border border-border bg-background p-4">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">
+                            {transaction_details.title} — Outstanding Details
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {format(new Date(transaction_details.date), 'MMM d, yyyy')}
+                          </p>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+                            <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
+                              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Should Pay</p>
+                              <p className="mt-2 font-semibold text-foreground font-mono text-lg">
+                                {sym}{round(transaction_details.computedShare, 2)}
+                              </p>
                             </div>
-                          ))}
-                        </div>
-                        <div className="flex justify-between mt-3 pt-2 border-t border-border/50 text-xs">
-                          <span className="text-muted-foreground">Total owed</span>
-                          <span className="font-semibold text-foreground font-mono">
-                            {sym}{round(debt.transactions.reduce((s, t) => s + t.share, 0), 2)}
-                          </span>
+                            <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
+                              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Already Paid</p>
+                              <p className="mt-2 font-semibold text-foreground font-mono text-lg">
+                                {sym}{round(transaction_details.paidAmount, 2)}
+                              </p>
+                            </div>
+                            <div className="rounded-lg border border-border/50 bg-red-500/5 p-4">
+                              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Still Owes</p>
+                              <p className="mt-2 font-semibold text-red-500 font-mono text-lg">
+                                {sym}{round(transaction_details.remaining, 2)}
+                              </p>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     )}

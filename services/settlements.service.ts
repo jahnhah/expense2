@@ -28,7 +28,7 @@ export interface PairwiseDebt {
   toName: string;
   toColor: string;
   amount: number;
-  transactions: DebtTransaction[];
+  transaction_details: DebtTransaction;
 }
 
 export interface SettlementsData {
@@ -88,7 +88,8 @@ export const SettlementsService = {
       amount:       Number(r.amount),
     }));
 
-    const pairwiseDebts: PairwiseDebt[] = (pairwiseRes.data ?? []).map((r: Record<string, unknown>) => ({
+    const pairwiseDebts: PairwiseDebt[] = (pairwiseRes.data ?? []).map((r: Record<string, unknown>) => (
+    {
       fromMemberId: r.from_member_id as string,
       fromName:     r.from_name as string,
       fromColor:    r.from_color as string,
@@ -96,30 +97,7 @@ export const SettlementsService = {
       toName:       r.to_name as string,
       toColor:      r.to_color as string,
       amount:       Number(r.amount),
-      transactions: (r.transactions as {
-        title: string;
-        date: string;
-        share: number;
-        computed_share: number;
-        paid_amount: number;
-        remaining: number;
-        payments: Array<{ amount: number; date: string; note: string; settlement_id?: string; transaction_id?: string | null }>;
-      }[])
-        .map((tx) => ({
-          title: tx.title,
-          date: tx.date,
-          share: tx.share,
-          computedShare: tx.computed_share,
-          paidAmount: tx.paid_amount,
-          remaining: tx.remaining,
-          payments: (tx.payments ?? []).map((payment) => ({
-            amount: payment.amount,
-            date: payment.date,
-            note: payment.note,
-            settlementId: payment.settlement_id,
-            transactionId: payment.transaction_id,
-          })),
-        })) ?? [],
+      transaction_details: r.transaction_details as DebtTransaction,
     }));
 
     const totalExpenses = Number((totalExpensesRes.data as { sum: number } | null)?.sum ?? 0);
