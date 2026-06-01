@@ -11,6 +11,7 @@ export interface DebtPayment {
 }
 
 export interface DebtTransaction {
+  id: string;
   title: string;
   date: string;
   share: number;
@@ -18,6 +19,7 @@ export interface DebtTransaction {
   paidAmount: number;
   remaining: number;
   payments: DebtPayment[];
+  transaction_participant_id: string;
 }
 
 export interface PairwiseDebt {
@@ -128,17 +130,22 @@ export const SettlementsService = {
     amount: number,
     date: string,
     note: string,
+    transactionParticipantId?: string,
     transactionId?: string,
   ) => {
-    return supabase.rpc('record_settlement', {
+    const params: Record<string, unknown> = {
       p_household_id:   householdId,
       p_from_member_id: fromMemberId,
       p_to_member_id:   toMemberId,
       p_amount:         amount,
       p_date:           date,
       p_note:           note.trim(),
-      p_transaction_id: transactionId ?? null,
-    });
+    };
+
+    if (transactionParticipantId) params.p_transaction_participant_id = transactionParticipantId;
+    if (transactionId) params.p_transaction_id = transactionId;
+
+    return supabase.rpc('record_settlement', params);
   },
 
   deleteSettlement: async (id: string) => {

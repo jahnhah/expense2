@@ -49,6 +49,8 @@ export default function SettlementsPage() {
   const [recordAmount, setRecordAmount] = useState('');
   const [recordDate, setRecordDate] = useState(new Date().toISOString().split('T')[0]);
   const [recordNote, setRecordNote] = useState('');
+  const [recordTransactionId, setRecordTransactionId] = useState<string | null>(null);
+  const [recordTransactionRefId, setRecordTransactionRefId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Delete settlement
@@ -58,19 +60,37 @@ export default function SettlementsPage() {
   const [expandedDebt, setExpandedDebt] = useState<string | null>(null);
   const [selectedTransactionIndex, setSelectedTransactionIndex] = useState<number | null>(null);
 
-  function openRecord(fromId?: string, toId?: string, amount?: number) {
+  function openRecord(
+    fromId?: string,
+    toId?: string,
+    amount?: number,
+    transaction_participant_id?: string | null,
+    transaction_id?: string | null,
+  ) {
     setRecordFrom(fromId ?? '');
     setRecordTo(toId ?? '');
     setRecordAmount(amount ? amount.toString() : '');
     setRecordDate(new Date().toISOString().split('T')[0]);
     setRecordNote('');
+    setRecordTransactionId(transaction_participant_id ?? null);
+    setRecordTransactionRefId(transaction_id ?? null);
     setShowRecord(true);
   }
 
   async function saveSettlement() {
     if (!recordFrom || !recordTo || !recordAmount || recordFrom === recordTo) return;
     setSaving(true);
-    await recordSettlement(recordFrom, recordTo, parseFloat(recordAmount), recordDate, recordNote);
+    console.log('huhuhuhu= ' , recordTransactionId);
+    const res=await recordSettlement(
+      recordFrom,
+      recordTo,
+      parseFloat(recordAmount),
+      recordDate,
+      recordNote,
+      recordTransactionId ?? undefined,
+      recordTransactionRefId ?? undefined,
+    );
+    console.log('fafana erreur= ', res);
     setSaving(false);
     setShowRecord(false);
   }
@@ -331,7 +351,13 @@ export default function SettlementsPage() {
                           variant="outline"
                           size="sm"
                           className="gap-1.5 text-xs h-7"
-                          onClick={() => openRecord(debt.fromMemberId, debt.toMemberId, debt.amount)}
+                          onClick={() => openRecord(
+                            debt.fromMemberId,
+                            debt.toMemberId,
+                            debt.amount,
+                            transaction_details.transaction_participant_id,
+                            transaction_details.id,
+                          )}
                         >
                           <HandCoins className="w-3 h-3" />
                           Settle
@@ -539,6 +565,8 @@ export default function SettlementsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            <input type="hidden" name="transaction_participant_id" value={recordTransactionId ?? ''} />
+            <input type="hidden" name="transaction_id" value={recordTransactionRefId ?? ''} />
             <div className="space-y-2">
               <Label>From (payer)</Label>
               <select

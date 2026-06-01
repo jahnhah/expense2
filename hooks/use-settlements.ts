@@ -14,6 +14,7 @@ interface UseSettlementsResult {
     amount: number,
     date: string,
     note: string,
+    transactionParticipantId?: string,
     transactionId?: string,
   ) => Promise<void>;
   deleteSettlement: (id: string) => Promise<void>;
@@ -48,17 +49,20 @@ export function useSettlements(householdId: string): UseSettlementsResult {
       amount: number,
       date: string,
       note: string,
+      transactionParticipantId?: string,
       transactionId?: string,
     ) => {
-      await SettlementsService.recordSettlement(
+      const res = await SettlementsService.recordSettlement(
         householdId,
         fromMemberId,
         toMemberId,
         amount,
         date,
         note,
+        transactionParticipantId,
         transactionId,
       );
+      console.log('recordSettlement result= ', res);
       await load();
     },
     [householdId, load],

@@ -10,7 +10,8 @@ CREATE OR REPLACE FUNCTION record_settlement(
   p_amount numeric,
   p_date date,
   p_note text,
-  p_transaction_id uuid DEFAULT NULL
+  p_transaction_participant_id uuid,
+  p_transaction_id uuid
 )
 RETURNS TABLE (
   id uuid,
@@ -32,7 +33,54 @@ DECLARE
   v_total_remaining numeric := 0;
   v_temp_amount numeric := p_amount;
 BEGIN
-  IF p_transaction_id IS NOT NULL THEN
+  IF p_transaction_participant_id IS NOT NULL THEN
+    -- try to lock participant by id
+    SELECT *
+    INTO v_participant
+    FROM transaction_participants
+    WHERE id = p_transaction_participant_id
+    FOR UPDATE;
+
+    IF FOUND THEN
+      -- existing participant: update using current logic
+      v_participant.paid_amount := COALESCE(v_participant.paid_amount, 0);
+      v_participant.computed_share := COALESCE(v_participant.computed_share, 0);
+
+      IF v_participant.computed_share <= v_participant.paid_amount + p_amount THEN
+        UPDATE transaction_participants
+        SET paid_amount = v_participant.paid_amount + p_amount,
+            is_paid = true
+        WHERE transaction_participants.id = v_participant.id;
+      ELSE
+        UPDATE transaction_participants
+        SET paid_amount = v_participant.paid_amount + p_amount
+        WHERE transaction_participants.id = v_participant.id;
+      END IF;
+    ELSE
+      -- participant id not found: create one using provided transaction id
+      IF p_transaction_id IS NULL THEN
+        RAISE EXCEPTION 'transaction_id required to create missing participant';
+      END IF;
+
+      INSERT INTO transaction_participants (
+        transaction_id,
+        member_id,
+        formula,
+        computed_value,
+        computed_share,
+        paid_amount,
+        is_paid
+      ) VALUES (
+        p_transaction_id,
+        p_from_member_id,
+        '1',
+        0,
+        p_amount,
+        p_amount,
+        true
+      ) RETURNING * INTO v_participant;
+    END IF;
+  ELSIF p_transaction_id IS NOT NULL THEN
     PERFORM 1
     FROM transactions
     WHERE transactions.id = p_transaction_id

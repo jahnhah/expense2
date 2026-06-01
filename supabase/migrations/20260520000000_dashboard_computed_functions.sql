@@ -271,14 +271,15 @@ AS $$
       2
     ) AS amount,
 
-
-   jsonb_build_object(
-  'title', t.title,
-  'date', MAX(t.date),
-  'computedShare', ROUND(SUM(tp.computed_share), 2),
-  'paidAmount', ROUND(SUM(tp.paid_amount), 2),
-  'remaining', ROUND(SUM(tp.computed_share - tp.paid_amount), 2)
-) AS transaction_details
+    jsonb_build_object(
+      'id', t.id,
+      'title', t.title,
+      'date', t.date,
+      'computedShare', ROUND(SUM(tp.computed_share), 2),
+      'paidAmount', ROUND(SUM(tp.paid_amount), 2),
+      'remaining', ROUND(SUM(tp.computed_share - tp.paid_amount), 2),
+      'transaction_participant_id', tp.id
+    ) AS transaction_details
 
   FROM transaction_participants tp
   JOIN transactions t
@@ -291,17 +292,19 @@ AS $$
   WHERE t.household_id = p_household_id
 
   GROUP BY
+    t.id,
     t.title,
     t.date,
+    tp.id,
     tp.member_id,
     fm.name,
     fm.color,
     t.payer_id,
     tm.name,
     tm.color
-  
+
   HAVING
-  SUM(tp.computed_share - tp.paid_amount) > 0
+    SUM(tp.computed_share - tp.paid_amount) > 0
 
   ORDER BY
     MAX(tp.created_at) DESC;
