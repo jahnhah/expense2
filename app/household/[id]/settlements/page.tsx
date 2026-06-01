@@ -60,6 +60,10 @@ export default function SettlementsPage() {
   const [expandedDebt, setExpandedDebt] = useState<string | null>(null);
   const [selectedTransactionIndex, setSelectedTransactionIndex] = useState<number | null>(null);
 
+  // Debt filters
+  const [filterFromName, setFilterFromName] = useState('');
+  const [filterToName, setFilterToName] = useState('');
+
   function openRecord(
     fromId?: string,
     toId?: string,
@@ -302,6 +306,48 @@ export default function SettlementsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {/* Filter Controls */}
+          {pairwiseDebts.length > 0 && (
+            <div className="mb-4 p-3 rounded-lg border border-border bg-muted/20 space-y-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Filter Debts
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-xs">From (Debtor)</Label>
+                  <select
+                    value={filterFromName}
+                    onChange={(e) => setFilterFromName(e.target.value)}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="">All members</option>
+                    {Array.from(new Set(pairwiseDebts.map((d) => d.fromName))).sort().map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">To (Creditor)</Label>
+                  <select
+                    value={filterToName}
+                    onChange={(e) => setFilterToName(e.target.value)}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="">All members</option>
+                    {Array.from(new Set(pairwiseDebts.map((d) => d.toName))).sort().map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Debts List */}
           {pairwiseDebts.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-center">
               <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center mb-3">
@@ -312,7 +358,13 @@ export default function SettlementsPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {pairwiseDebts.map((debt: any) => {
+              {pairwiseDebts
+                .filter(
+                  (debt) =>
+                    (filterFromName === '' || debt.fromName === filterFromName) &&
+                    (filterToName === '' || debt.toName === filterToName)
+                )
+                .map((debt: any) => {
                 const key = `${debt.fromMemberId}->${debt.toMemberId}`;
                 const isExpanded = expandedDebt === key;
                 const transaction_details = debt.transaction_details ?? {};
@@ -420,6 +472,17 @@ export default function SettlementsPage() {
               })}
             </div>
           )}
+          {pairwiseDebts.length > 0 &&
+            pairwiseDebts.filter(
+              (debt) =>
+                (filterFromName === '' || debt.fromName === filterFromName) &&
+                (filterToName === '' || debt.toName === filterToName)
+            ).length === 0 && (
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <p className="text-sm font-medium text-muted-foreground">No debts match your filters</p>
+                <p className="text-xs text-muted-foreground mt-1">Try adjusting the filter criteria</p>
+              </div>
+            )}
         </CardContent>
       </Card>
 
