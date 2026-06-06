@@ -365,7 +365,7 @@ export default function SettlementsPage() {
                     (filterToName === '' || debt.toName === filterToName)
                 )
                 .map((debt: any) => {
-                const key = `${debt.fromMemberId}->${debt.toMemberId}`;
+                const key = `${debt.fromMemberId}->${debt.toMemberId}->${debt.transaction_details?.transaction_participant_id ?? debt.transaction_details?.id ?? ''}`;
                 const isExpanded = expandedDebt === key;
                 const transaction_details = debt.transaction_details ?? {};
 

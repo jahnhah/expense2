@@ -146,6 +146,29 @@ export type Database = {
           created_at?: string;
         };
       };
+      household_backups: {
+        Row: {
+          id: string;
+          household_id: string;
+          name: string;
+          sql_dump: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          household_id: string;
+          name: string;
+          sql_dump: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          household_id?: string;
+          name?: string;
+          sql_dump?: string;
+          created_at?: string;
+        };
+      };
     };
   };
 };
