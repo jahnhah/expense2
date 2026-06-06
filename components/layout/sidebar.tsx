@@ -17,6 +17,7 @@ const navItems = [
   { label: 'Members', href: '/members', icon: Users },
   { label: 'Categories', href: '/categories', icon: Tag },
   { label: 'RAG Assistant', href: '/rag', icon: Brain },
+  { label: 'Data', href: '/data', icon: Layers },
 ];
 
 export function Sidebar({ household }: SidebarProps) {

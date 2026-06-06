@@ -49,27 +49,52 @@ export default function SettlementsPage() {
   const [recordAmount, setRecordAmount] = useState('');
   const [recordDate, setRecordDate] = useState(new Date().toISOString().split('T')[0]);
   const [recordNote, setRecordNote] = useState('');
+  const [recordTransactionId, setRecordTransactionId] = useState<string | null>(null);
+  const [recordTransactionRefId, setRecordTransactionRefId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Delete settlement
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  // Expanded debts
+  // Expanded debts - track debt pair and selected transaction index
   const [expandedDebt, setExpandedDebt] = useState<string | null>(null);
+  const [selectedTransactionIndex, setSelectedTransactionIndex] = useState<number | null>(null);
 
-  function openRecord(fromId?: string, toId?: string, amount?: number) {
+  // Debt filters
+  const [filterFromName, setFilterFromName] = useState('');
+  const [filterToName, setFilterToName] = useState('');
+
+  function openRecord(
+    fromId?: string,
+    toId?: string,
+    amount?: number,
+    transaction_participant_id?: string | null,
+    transaction_id?: string | null,
+  ) {
     setRecordFrom(fromId ?? '');
     setRecordTo(toId ?? '');
     setRecordAmount(amount ? amount.toString() : '');
     setRecordDate(new Date().toISOString().split('T')[0]);
     setRecordNote('');
+    setRecordTransactionId(transaction_participant_id ?? null);
+    setRecordTransactionRefId(transaction_id ?? null);
     setShowRecord(true);
   }
 
   async function saveSettlement() {
     if (!recordFrom || !recordTo || !recordAmount || recordFrom === recordTo) return;
     setSaving(true);
-    await recordSettlement(recordFrom, recordTo, parseFloat(recordAmount), recordDate, recordNote);
+    console.log('huhuhuhu= ' , recordTransactionId);
+    const res=await recordSettlement(
+      recordFrom,
+      recordTo,
+      parseFloat(recordAmount),
+      recordDate,
+      recordNote,
+      recordTransactionId ?? undefined,
+      recordTransactionRefId ?? undefined,
+    );
+    console.log('fafana erreur= ', res);
     setSaving(false);
     setShowRecord(false);
   }
@@ -281,6 +306,48 @@ export default function SettlementsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {/* Filter Controls */}
+          {pairwiseDebts.length > 0 && (
+            <div className="mb-4 p-3 rounded-lg border border-border bg-muted/20 space-y-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Filter Debts
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-xs">From (Debtor)</Label>
+                  <select
+                    value={filterFromName}
+                    onChange={(e) => setFilterFromName(e.target.value)}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="">All members</option>
+                    {Array.from(new Set(pairwiseDebts.map((d) => d.fromName))).sort().map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">To (Creditor)</Label>
+                  <select
+                    value={filterToName}
+                    onChange={(e) => setFilterToName(e.target.value)}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="">All members</option>
+                    {Array.from(new Set(pairwiseDebts.map((d) => d.toName))).sort().map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Debts List */}
           {pairwiseDebts.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-center">
               <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center mb-3">
@@ -291,15 +358,19 @@ export default function SettlementsPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {pairwiseDebts.map((debt) => {
-                const key = `${debt.fromMemberId}->${debt.toMemberId}`;
+              {pairwiseDebts
+                .filter(
+                  (debt) =>
+                    (filterFromName === '' || debt.fromName === filterFromName) &&
+                    (filterToName === '' || debt.toName === filterToName)
+                )
+                .map((debt: any) => {
+                const key = `${debt.fromMemberId}->${debt.toMemberId}->${debt.transaction_details?.transaction_participant_id ?? debt.transaction_details?.id ?? ''}`;
                 const isExpanded = expandedDebt === key;
+                const transaction_details = debt.transaction_details ?? {};
 
                 return (
-                  <div
-                    key={key}
-                    className="rounded-xl border border-border bg-card"
-                  >
+                  <div key={key} className="rounded-xl border border-border bg-card">
                     <div className="flex items-center gap-3 p-4">
                       <div
                         className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
@@ -319,9 +390,6 @@ export default function SettlementsPage() {
                         <p className="text-sm font-medium text-foreground">
                           {debt.fromName} owes {debt.toName}
                         </p>
-                        <p className="text-xs text-muted-foreground">
-                          {debt.transactions.length} transaction{debt.transactions.length !== 1 ? 's' : ''}
-                        </p>
                       </div>
 
                       <div className="text-right shrink-0">
@@ -335,7 +403,13 @@ export default function SettlementsPage() {
                           variant="outline"
                           size="sm"
                           className="gap-1.5 text-xs h-7"
-                          onClick={() => openRecord(debt.fromMemberId, debt.toMemberId, debt.amount)}
+                          onClick={() => openRecord(
+                            debt.fromMemberId,
+                            debt.toMemberId,
+                            debt.amount,
+                            transaction_details.transaction_participant_id,
+                            transaction_details.id,
+                          )}
                         >
                           <HandCoins className="w-3 h-3" />
                           Settle
@@ -344,7 +418,10 @@ export default function SettlementsPage() {
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7"
-                          onClick={() => setExpandedDebt(isExpanded ? null : key)}
+                          onClick={() => {
+                            setExpandedDebt(isExpanded ? null : key);
+                            setSelectedTransactionIndex(isExpanded ? null : 0);
+                          }}
                         >
                           {isExpanded ? (
                             <ChevronUp className="w-3.5 h-3.5" />
@@ -358,34 +435,35 @@ export default function SettlementsPage() {
                     {isExpanded && (
                       <div className="px-4 pb-4 border-t border-border/50 pt-3">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                          Why {debt.fromName} owes {sym}{debt.amount}
+                          Select transaction for details
                         </p>
-                        <div className="space-y-2">
-                          {debt.transactions.map((tx, i) => (
-                            <div
-                              key={i}
-                              className="flex items-center justify-between p-2.5 rounded-lg bg-muted/30"
-                            >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 shrink-0" />
-                                <span className="text-sm text-foreground truncate">{tx.title}</span>
-                              </div>
-                              <div className="flex items-center gap-3 shrink-0">
-                                <span className="text-xs text-muted-foreground">
-                                  {format(new Date(tx.date), 'MMM d, yyyy')}
-                                </span>
-                                <span className="text-sm font-semibold text-foreground font-mono">
-                                  {sym}{round(tx.share, 2)}
-                                </span>
-                              </div>
+                        <div className="rounded-xl border border-border bg-background p-4">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">
+                            {transaction_details.title} — Outstanding Details
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {format(new Date(transaction_details.date), 'MMM d, yyyy')}
+                          </p>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+                            <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
+                              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Should Pay</p>
+                              <p className="mt-2 font-semibold text-foreground font-mono text-lg">
+                                {sym}{round(transaction_details.computedShare, 2)}
+                              </p>
                             </div>
-                          ))}
-                        </div>
-                        <div className="flex justify-between mt-3 pt-2 border-t border-border/50 text-xs">
-                          <span className="text-muted-foreground">Total owed</span>
-                          <span className="font-semibold text-foreground font-mono">
-                            {sym}{round(debt.transactions.reduce((s, t) => s + t.share, 0), 2)}
-                          </span>
+                            <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
+                              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Already Paid</p>
+                              <p className="mt-2 font-semibold text-foreground font-mono text-lg">
+                                {sym}{round(transaction_details.paidAmount, 2)}
+                              </p>
+                            </div>
+                            <div className="rounded-lg border border-border/50 bg-red-500/5 p-4">
+                              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Still Owes</p>
+                              <p className="mt-2 font-semibold text-red-500 font-mono text-lg">
+                                {sym}{round(transaction_details.remaining, 2)}
+                              </p>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -394,6 +472,17 @@ export default function SettlementsPage() {
               })}
             </div>
           )}
+          {pairwiseDebts.length > 0 &&
+            pairwiseDebts.filter(
+              (debt) =>
+                (filterFromName === '' || debt.fromName === filterFromName) &&
+                (filterToName === '' || debt.toName === filterToName)
+            ).length === 0 && (
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <p className="text-sm font-medium text-muted-foreground">No debts match your filters</p>
+                <p className="text-xs text-muted-foreground mt-1">Try adjusting the filter criteria</p>
+              </div>
+            )}
         </CardContent>
       </Card>
 
@@ -539,6 +628,8 @@ export default function SettlementsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            <input type="hidden" name="transaction_participant_id" value={recordTransactionId ?? ''} />
+            <input type="hidden" name="transaction_id" value={recordTransactionRefId ?? ''} />
             <div className="space-y-2">
               <Label>From (payer)</Label>
               <select

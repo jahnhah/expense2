@@ -2,6 +2,26 @@ import { supabase } from '@/lib/supabase';
 import type { Member, Settlement } from '@/lib/types';
 import type { MemberBalance, SuggestedSettlement } from './dashboard.service';
 
+export interface DebtPayment {
+  amount: number;
+  date: string;
+  note: string;
+  settlementId?: string;
+  transactionId?: string | null;
+}
+
+export interface DebtTransaction {
+  id: string;
+  title: string;
+  date: string;
+  share: number;
+  computedShare: number;
+  paidAmount: number;
+  remaining: number;
+  payments: DebtPayment[];
+  transaction_participant_id: string;
+}
+
 export interface PairwiseDebt {
   fromMemberId: string;
   fromName: string;
@@ -10,7 +30,7 @@ export interface PairwiseDebt {
   toName: string;
   toColor: string;
   amount: number;
-  transactions: { title: string; date: string; share: number }[];
+  transaction_details: DebtTransaction;
 }
 
 export interface SettlementsData {
@@ -70,7 +90,8 @@ export const SettlementsService = {
       amount:       Number(r.amount),
     }));
 
-    const pairwiseDebts: PairwiseDebt[] = (pairwiseRes.data ?? []).map((r: Record<string, unknown>) => ({
+    const pairwiseDebts: PairwiseDebt[] = (pairwiseRes.data ?? []).map((r: Record<string, unknown>) => (
+    {
       fromMemberId: r.from_member_id as string,
       fromName:     r.from_name as string,
       fromColor:    r.from_color as string,
@@ -78,7 +99,7 @@ export const SettlementsService = {
       toName:       r.to_name as string,
       toColor:      r.to_color as string,
       amount:       Number(r.amount),
-      transactions: (r.transactions as { title: string; date: string; share: number }[]) ?? [],
+      transaction_details: r.transaction_details as DebtTransaction,
     }));
 
     const totalExpenses = Number((totalExpensesRes.data as { sum: number } | null)?.sum ?? 0);
@@ -109,15 +130,22 @@ export const SettlementsService = {
     amount: number,
     date: string,
     note: string,
+    transactionParticipantId?: string,
+    transactionId?: string,
   ) => {
-    return supabase.from('settlements').insert({
-      household_id:   householdId,
-      from_member_id: fromMemberId,
-      to_member_id:   toMemberId,
-      amount,
-      date,
-      note: note.trim(),
-    });
+    const params: Record<string, unknown> = {
+      p_household_id:   householdId,
+      p_from_member_id: fromMemberId,
+      p_to_member_id:   toMemberId,
+      p_amount:         amount,
+      p_date:           date,
+      p_note:           note.trim(),
+    };
+
+    if (transactionParticipantId) params.p_transaction_participant_id = transactionParticipantId;
+    if (transactionId) params.p_transaction_id = transactionId;
+
+    return supabase.rpc('record_settlement', params);
   },
 
   deleteSettlement: async (id: string) => {

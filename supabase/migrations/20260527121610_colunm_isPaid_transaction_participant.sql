@@ -1,0 +1,3 @@
+
+ALTER TABLE transaction_participants
+  ADD COLUMN IF NOT EXISTS is_paid BOOLEAN DEFAULT FALSE;

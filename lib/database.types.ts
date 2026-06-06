@@ -119,6 +119,8 @@ export type Database = {
           formula: string;
           computed_value: number | null;
           computed_share: number | null;
+          paid_amount: number | null;
+          is_paid: boolean;
           created_at: string;
         };
         Insert: {
@@ -128,6 +130,8 @@ export type Database = {
           formula?: string;
           computed_value?: number | null;
           computed_share?: number | null;
+          paid_amount?: number | null;
+          is_paid?: boolean;
           created_at?: string;
         };
         Update: {
@@ -137,6 +141,31 @@ export type Database = {
           formula?: string;
           computed_value?: number | null;
           computed_share?: number | null;
+          paid_amount?: number | null;
+          is_paid?: boolean;
+          created_at?: string;
+        };
+      };
+      household_backups: {
+        Row: {
+          id: string;
+          household_id: string;
+          name: string;
+          sql_dump: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          household_id: string;
+          name: string;
+          sql_dump: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          household_id?: string;
+          name?: string;
+          sql_dump?: string;
           created_at?: string;
         };
       };

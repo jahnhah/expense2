@@ -247,48 +247,67 @@ $$;
 CREATE OR REPLACE FUNCTION get_pairwise_debts(p_household_id uuid)
 RETURNS TABLE (
   from_member_id uuid,
-  from_name      text,
-  from_color     text,
-  to_member_id   uuid,
-  to_name        text,
-  to_color       text,
-  amount         numeric,
-  transactions   jsonb
+  from_name text,
+  from_color text,
+  to_member_id uuid,
+  to_name text,
+  to_color text,
+  amount numeric,
+  transaction_details jsonb
 )
 LANGUAGE sql
 STABLE
 AS $$
   SELECT
-    tp.member_id                                                AS from_member_id,
-    fm.name                                                     AS from_name,
-    fm.color                                                    AS from_color,
-    t.payer_id                                                  AS to_member_id,
-    tm.name                                                     AS to_name,
-    tm.color                                                    AS to_color,
+    tp.member_id AS from_member_id,
+    fm.name AS from_name,
+    fm.color AS from_color,
+    t.payer_id AS to_member_id,
+    tm.name AS to_name,
+    tm.color AS to_color,
+
     ROUND(
-      SUM(tp.computed_share) - COALESCE(SUM(s.amount), 0),
-    2)                                                          AS amount,
-    jsonb_agg(
-      jsonb_build_object(
-        'title', t.title,
-        'date',  t.date,
-        'share', ROUND(tp.computed_share, 2)
-      )
-      ORDER BY t.date DESC
-    )                                                           AS transactions
+      SUM(tp.computed_share - tp.paid_amount),
+      2
+    ) AS amount,
+
+    jsonb_build_object(
+      'id', t.id,
+      'title', t.title,
+      'date', t.date,
+      'computedShare', ROUND(SUM(tp.computed_share), 2),
+      'paidAmount', ROUND(SUM(tp.paid_amount), 2),
+      'remaining', ROUND(SUM(tp.computed_share - tp.paid_amount), 2),
+      'transaction_participant_id', tp.id
+    ) AS transaction_details
+
   FROM transaction_participants tp
-  JOIN transactions t  ON t.id  = tp.transaction_id
-  JOIN members      fm ON fm.id = tp.member_id
-  JOIN members      tm ON tm.id = t.payer_id
-  LEFT JOIN settlements s ON s.household_id = t.household_id
-    AND s.from_member_id = tp.member_id
-    AND s.to_member_id = t.payer_id
+  JOIN transactions t
+    ON t.id = tp.transaction_id
+  JOIN members fm
+    ON fm.id = tp.member_id
+  JOIN members tm
+    ON tm.id = t.payer_id
+
   WHERE t.household_id = p_household_id
-    AND tp.member_id  <> t.payer_id   -- exclude self-pay rows
-    AND t.payer_id IS NOT NULL
-  GROUP BY tp.member_id, fm.name, fm.color, t.payer_id, tm.name, tm.color
-  HAVING SUM(tp.computed_share) - COALESCE(SUM(s.amount), 0) > 0.01
-  ORDER BY SUM(tp.computed_share) - COALESCE(SUM(s.amount), 0) DESC;
+
+  GROUP BY
+    t.id,
+    t.title,
+    t.date,
+    tp.id,
+    tp.member_id,
+    fm.name,
+    fm.color,
+    t.payer_id,
+    tm.name,
+    tm.color
+
+  HAVING
+    SUM(tp.computed_share - tp.paid_amount) > 0
+
+  ORDER BY
+    MAX(tp.created_at) DESC;
 $$;
 
 CREATE OR REPLACE FUNCTION get_total_expenses(p_household_id uuid)
