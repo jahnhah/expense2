@@ -16,7 +16,7 @@ const navItems = [
   { label: 'Settlements', href: '/settlements', icon: Scale },
   { label: 'Members', href: '/members', icon: Users },
   { label: 'Categories', href: '/categories', icon: Tag },
-  { label: 'RAG Assistant', href: '/rag', icon: Brain },
+  { label: 'Expense Assistant', href: '/rag', icon: Brain },
   { label: 'Data', href: '/data', icon: Layers },
 ];
 
